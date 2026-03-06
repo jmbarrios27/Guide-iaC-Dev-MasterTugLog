@@ -14,7 +14,7 @@
     "keyVaultName": { "value": "kv-opap-dev-eus2-001" },
 
     "sqlServerName": { "value": "sql-opap-dev-eus2-001" },
-    "sqlDatabaseName": { "value": "tuglog-dev-db" },
+    "sqlDatabaseName": { "value": "db-opap-dev" },
     "sqlAdminLogin": { "value": "opapsqladmin" },
     "sqlAdminPassword": { "value": "M@sterTugLog!" },
 
@@ -23,4 +23,5 @@
 
     "dataFactoryName": { "value": "adf-opap-dev-eus2-001" }
   }
+
 }

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "eastus2" },
+
+    "appServicePlanName": { "value": "asp-opap-dev-eus2-001" },
+    "webAppName": { "value": "app-tuglog-dev-eus2-001" },
+
+    "containerRegistryName": { "value": "acr-opap-dev-eus2-001" },
+    "containerImageName": { "value": "tuglog-app" },
+    "containerImageTag": { "value": "latest" },
+
+    "keyVaultName": { "value": "kv-opap-dev-eus2-001" },
+
+    "sqlServerName": { "value": "sql-opap-dev-eus2-001" },
+    "sqlDatabaseName": { "value": "tuglog-dev-db" },
+    "sqlAdminLogin": { "value": "opapsqladmin" },
+    "sqlAdminPassword": { "value": "M@sterTugLog!" },
+
+    "aadAdminGroupObjectId": { "value": "2f06be81-582f-42c8-8bd5-1187211afe2e" },
+    "aadAdminLogin": { "value": "NTRO_Capitanes_Remolcadores" },
+
+    "dataFactoryName": { "value": "adf-opap-dev-eus2-001" }
+  }
+}

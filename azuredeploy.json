@@ -1,0 +1,278 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "type": "string", "defaultValue": "eastus2" },
+
+    "resourceTags": {
+      "type": "object",
+      "defaultValue": {
+        "application": "tuglog",
+        "environment": "dev",
+        "region": "eastus2",
+        "owner": "OP-AP"
+      }
+    },
+
+    "appServicePlanName": { "type": "string" },
+    "webAppName": { "type": "string" },
+
+    "containerRegistryName": { "type": "string" },
+    "containerImageName": { "type": "string", "defaultValue": "tuglog-app" },
+    "containerImageTag": { "type": "string", "defaultValue": "latest" },
+
+    "keyVaultName": { "type": "string" },
+
+    "sqlServerName": { "type": "string" },
+    "sqlDatabaseName": { "type": "string" },
+    "sqlAdminLogin": { "type": "string" },
+    "sqlAdminPassword": { "type": "secureString" },
+
+    "aadAdminGroupObjectId": { "type": "string" },
+    "aadAdminLogin": { "type": "string", "defaultValue": "NTRO_Capitanes_Remolcadores" },
+
+    "dataFactoryName": { "type": "string" }
+  },
+  "variables": {
+    "planSku": "B1",
+    "planTier": "Basic",
+    "sqlSkuName": "Standard",
+    "sqlSkuTier": "Standard",
+    "sqlSkuCapacity": 50,
+
+    "roleKvSecretsUser": "4633458b-17de-408a-b874-0445c86b69e6",
+    "roleAcrPull": "7f951dda-4ed3-4680-a7ca-43fe172d538d",
+
+    "kvSecretDbConn": "DB-CONNECTION-STRING"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('containerRegistryName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('resourceTags')]",
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "adminUserEnabled": false,
+        "publicNetworkAccess": "Enabled",
+        "policies": {
+          "quarantinePolicy": { "status": "disabled" },
+          "trustPolicy": { "type": "Notary", "status": "disabled" },
+          "retentionPolicy": { "days": 7, "status": "disabled" },
+          "exportPolicy": { "status": "enabled" },
+          "azureADAuthenticationAsArmPolicy": { "status": "enabled" },
+          "softDeletePolicy": { "retentionDays": 7, "status": "disabled" }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('resourceTags')]",
+      "kind": "linux",
+      "sku": {
+        "name": "[variables('planSku')]",
+        "tier": "[variables('planTier')]",
+        "size": "[variables('planSku')]",
+        "capacity": 1
+      },
+      "properties": { "reserved": true }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('webAppName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('resourceTags')]",
+      "kind": "app,linux,container",
+      "identity": { "type": "SystemAssigned" },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "[format('DOCKER|{0}.azurecr.io/{1}:{2}', parameters('containerRegistryName'), parameters('containerImageName'), parameters('containerImageTag'))]",
+          "alwaysOn": true,
+          "acrUseManagedIdentityCreds": true,
+          "appSettings": [
+            { "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE", "value": "false" },
+            { "name": "DOCKER_REGISTRY_SERVER_URL", "value": "[format('https://{0}.azurecr.io', parameters('containerRegistryName'))]" },
+            { "name": "FLASK_ENV", "value": "production" },
+            { "name": "PORT", "value": "8000" },
+            { "name": "WEBSITES_PORT", "value": "8000" },
+            { "name": "DB_SERVER_AZURE", "value": "[format('{0}.database.windows.net', parameters('sqlServerName'))]" },
+            { "name": "DB_NAME_AZURE", "value": "[parameters('sqlDatabaseName')]" },
+            { "name": "DB_USERNAME_AZURE", "value": "[parameters('sqlAdminLogin')]" },
+            { 
+              "name": "DB_PASSWORD_AZURE", 
+              "value": "[format('@Microsoft.KeyVault(SecretUri=https://{0}.vault.azure.net/secrets/DB-PASSWORD/)', parameters('keyVaultName'))]"
+            },
+            { 
+              "name": "SECRET_KEY", 
+              "value": "[format('@Microsoft.KeyVault(SecretUri=https://{0}.vault.azure.net/secrets/FLASK-SECRET-KEY/)', parameters('keyVaultName'))]"
+            },
+            { "name": "TIMEZONE", "value": "America/Panama" }
+          ]
+        }
+      }
+    },
+
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('resourceTags')]",
+      "properties": {
+        "tenantId": "[subscription().tenantId]",
+        "sku": { "family": "A", "name": "standard" },
+        "enableRbacAuthorization": true,
+        "enabledForTemplateDeployment": false,
+        "enableSoftDelete": true
+      }
+    },
+
+    {
+      "type": "Microsoft.Sql/servers",
+      "apiVersion": "2024-11-01-preview",
+      "name": "[parameters('sqlServerName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('resourceTags')]",
+      "properties": {
+        "administratorLogin": "[parameters('sqlAdminLogin')]",
+        "administratorLoginPassword": "[parameters('sqlAdminPassword')]",
+        "version": "12.0",
+        "minimalTlsVersion": "1.2",
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/administrators",
+      "apiVersion": "2024-11-01-preview",
+      "name": "[format('{0}/activeDirectory', parameters('sqlServerName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+      ],
+      "properties": {
+        "administratorType": "ActiveDirectory",
+        "principalType": "Group",
+        "login": "[parameters('aadAdminLogin')]",
+        "sid": "[parameters('aadAdminGroupObjectId')]",
+        "tenantId": "[subscription().tenantId]"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "apiVersion": "2024-11-01-preview",
+      "name": "[format('{0}/{1}', parameters('sqlServerName'), parameters('sqlDatabaseName'))]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+      ],
+      "sku": {
+        "name": "[variables('sqlSkuName')]",
+        "tier": "[variables('sqlSkuTier')]",
+        "capacity": "[variables('sqlSkuCapacity')]"
+      },
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "maxSizeBytes": 268435456000,
+        "zoneRedundant": false,
+        "readScale": "Disabled",
+        "requestedBackupStorageRedundancy": "Geo"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2024-11-01-preview",
+      "name": "[format('{0}/AllowAzureServices', parameters('sqlServerName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+      ],
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      }
+    },
+
+    {
+      "type": "Microsoft.DataFactory/factories",
+      "apiVersion": "2018-06-01",
+      "name": "[parameters('dataFactoryName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('resourceTags')]",
+      "identity": { "type": "SystemAssigned" },
+      "properties": {
+        "publicNetworkAccess": "Disabled"
+      }
+    },
+
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName')), parameters('webAppName'), 'acrpull')]",
+      "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName'))]"
+      ],
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2023-12-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleAcrPull'))]"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), parameters('webAppName'), 'kvsecretsuser')]",
+      "scope": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ],
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2023-12-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleKvSecretsUser'))]"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), parameters('dataFactoryName'), 'kvsecretsuser')]",
+      "scope": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', parameters('dataFactoryName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ],
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.DataFactory/factories', parameters('dataFactoryName')), '2018-06-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleKvSecretsUser'))]"
+      }
+    }
+  ],
+  "outputs": {
+    "webAppUrl": {
+      "type": "string",
+      "value": "[format('https://{0}.azurewebsites.net', parameters('webAppName'))]"
+    },
+    "acrLoginServer": {
+      "type": "string",
+      "value": "[format('{0}.azurecr.io', parameters('containerRegistryName'))]"
+    },
+    "sqlFqdn": {
+      "type": "string",
+      "value": "[format('{0}.database.windows.net', parameters('sqlServerName'))]"
+    }
+  }
+}

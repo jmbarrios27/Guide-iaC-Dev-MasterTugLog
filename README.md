@@ -53,6 +53,8 @@ Asegúrate de que estén `azuredeploy.json`, `parameters_dev.json` y `deploy.sh`
 az group create --name "<NOMBRE_RESOURCE_GROUP>" --location "eastus2"
 ```
 
+#### 3.1 Si ya existe en Resource Group entonces utilizar el existente.
+
 ### 4. Desplegar Infraestructura
 
 ```bash

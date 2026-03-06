@@ -33,8 +33,8 @@ Se abrirá el navegador para autenticarte. Después verás las suscripciones dis
 ```
 No     Subscription name    Subscription ID                       Tenant
 -----  -------------------  ------------------------------------  ----------------
-[1] *  ACP - Produccion     57ad0d81-2582-4def-b755-6e0ed5612d13  Autoridad del Canal
-[2]    ACP - Desarrollo     abc12345-...                          Autoridad del Canal
+[1] *  ACP - Dev            suscrpcionejemplodev                  Tenant a Elegir
+[2]    ACP - Sandbox        abc12345ejemplo                       Tenant a Elegir
 ```
 
 Escribe el número de la suscripción deseada y presiona Enter.

@@ -73,5 +73,5 @@ az deployment group create \
 | Web App | app-tuglog-dev-eus2-001 |
 | Key Vault | kv-opap-dev-eus2-001 |
 | SQL Server | sql-opap-dev-eus2-001 |
-| SQL Database | tuglog-dev-db |
+| SQL Database | db-opap-dev |
 | Data Factory | adf-opap-dev-eus2-001 |
